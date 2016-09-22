@@ -392,7 +392,7 @@ function installPackages(opts, cb) {
 }
 
 function npmPkgr(opts, cb) {
-  console.log('starting npm-pkgr with opts: %j', opts);
+  console.log('starting npm-pkgr with opts: %s', JSON.stringify(opts, null, 2));
 
   var commandName = argv._[0];
   var cacheRoot = argv['cache-directory'];
