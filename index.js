@@ -109,13 +109,13 @@ function createDirectoryCopy(src, target, cb) {
     function(cb) {
       if (!argv['symlink']) {
         const superTarget = _.dropRight(target.split('/')).join('/');
-        try {
-          new Rsync().flags('rt').source(src).destination(superTarget).execute(cb);
-          console.log('npm-pkgr used rsync -rt to copy');
-        } catch (err) {
-          console.log('npm-pkgr used cp -rp to copy');
-          fs.copy(src, target, { clobber: true, preserveTimestamps: true }, cb);
-        }
+        console.log('npm-pkgr trying rsync -rt to copy');
+        new Rsync().flags('rt').source(src).destination(superTarget).execute(function(err) {
+          if (err) {
+            console.log('npm-pkgr falling back to cp -rp to copy');
+            fs.copy(src, target, { clobber: true, preserveTimestamps: true }, cb);
+          } else { console.log('npm-pkgr used rsync -rt to copy'); }
+        });
       } else {
         fs.symlink(src, target, 'dir', cb);
       }
