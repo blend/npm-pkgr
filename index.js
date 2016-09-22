@@ -119,7 +119,10 @@ function createDirectoryCopy(src, target, cb) {
             if (err) {
               console.log('npm-pkgr falling back to cp -rp to copy');
               fs.copy(src, target, { clobber: true, preserveTimestamps: true }, cb);
-            } else { console.log('npm-pkgr used `rsync -rt --delete` to copy'); }
+            } else {
+              console.log('npm-pkgr used `rsync -rt --delete` to copy');
+              cb();
+            }
           });
       } else {
         fs.symlink(src, target, 'dir', cb);
