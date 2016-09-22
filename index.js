@@ -109,21 +109,28 @@ function createDirectoryCopy(src, target, cb) {
     function(cb) {
       if (!argv['symlink']) {
         const superTarget = _.dropRight(target.split('/')).join('/');
-        console.log('npm-pkgr trying `rsync -rt --delete` to copy');
-        new Rsync()
-          .flags('rt')
-          .set('delete')
+        console.log('npm-pkgr trying `rsync -at --delete` to copy');
+        const rsync = new Rsync()
+          .flags('at')
+          .delete()
           .source(src)
-          .destination(superTarget)
-          .execute(function(err) {
+          .destination(superTarget);
+        rsync.execute(function(err) {
             if (err) {
               console.log('npm-pkgr falling back to cp -rp to copy');
               fs.copy(src, target, { clobber: true, preserveTimestamps: true }, cb);
             } else {
-              console.log('npm-pkgr used `rsync -rt --delete` to copy');
+              console.log('npm-pkgr used `rsync -at --delete` to copy');
               cb();
             }
-          });
+          },
+          function(stdoutBuff) {
+            console.log(`[rsync stdout] ${stdoutBuff.toString()}`);
+          },
+          function(stderrBuff) {
+            console.log(`[rsync stderr] ${stderrBuff.toString()}`);
+          }
+        );
       } else {
         fs.symlink(src, target, 'dir', cb);
       }
