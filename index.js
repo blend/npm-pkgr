@@ -4,6 +4,7 @@ var util = require('util');
 var async = require('async');
 var _ = require('lodash');
 var fs = require('fs-extra');
+var Rsync = require('rsync');
 var lockfile = require('lockfile');
 var path = require('path');
 var aws = require('aws-sdk');
@@ -59,6 +60,10 @@ var argv = require('yargs')
     type: 'string',
     requiresArg: true
   })
+  .option('preserve-target', {
+    describe: 'Whether to overwrite output-directory before installing',
+    boolean: true
+  })
   .option('production', {
     describe: 'Install production packages only',
     boolean: true
@@ -92,10 +97,25 @@ function createDirectoryCopy(src, target, cb) {
     // The package is fully installed at this point so writes shouldn't occur,
     // and reads shouldn't conflict.
     //_.partial(lockfile.lock, copylock, lockOpts),
-    _.partial(fs.remove, target),
+    cb => {
+      if (!argv['preserve-target']) {
+        console.log(`npm-pkgr removing ${target}`);
+        fs.remove(target, cb);
+      } else {
+        console.log(`npm-pkgr preserving ${target}`);
+        cb();
+      }
+    },
     function(cb) {
       if (!argv['symlink']) {
-        fs.copy(src, target, { preserveTimestamps: true }, cb);
+        const superTarget = _.dropRight(target.split('/')).join('/');
+        try {
+          new Rsync().flags('rt').source(src).destination(superTarget).execute(cb);
+          console.log('npm-pkgr used rsync -rt to copy');
+        } catch (err) {
+          console.log('npm-pkgr used cp -rp to copy');
+          fs.copy(src, target, { preserveTimestamps: true }, cb);
+        }
       } else {
         fs.symlink(src, target, 'dir', cb);
       }
