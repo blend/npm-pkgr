@@ -114,7 +114,7 @@ function createDirectoryCopy(src, target, cb) {
           console.log('npm-pkgr used rsync -rt to copy');
         } catch (err) {
           console.log('npm-pkgr used cp -rp to copy');
-          fs.copy(src, target, { preserveTimestamps: true }, cb);
+          fs.copy(src, target, { clobber: true, preserveTimestamps: true }, cb);
         }
       } else {
         fs.symlink(src, target, 'dir', cb);
