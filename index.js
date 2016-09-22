@@ -108,13 +108,12 @@ function createDirectoryCopy(src, target, cb) {
     },
     function(cb) {
       if (!argv['symlink']) {
-        const superTarget = _.dropRight(target.split('/')).join('/');
         console.log('npm-pkgr trying `rsync -at --delete` to copy');
         const rsync = new Rsync()
           .flags('at')
           .delete()
-          .source(src)
-          .destination(superTarget);
+          .source(src + '/*')
+          .destination(target);
         rsync.execute(function(err) {
             if (err) {
               console.log('npm-pkgr falling back to cp -rp to copy');
