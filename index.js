@@ -112,7 +112,7 @@ function createDirectoryCopy(src, target, cb) {
         const rsync = new Rsync()
           .flags('at')
           .delete()
-          .source(src + '/*')
+          .source(src + '/.')
           .destination(target);
         rsync.execute(function(err) {
             if (err) {
