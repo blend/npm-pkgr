@@ -98,7 +98,7 @@ function createDirectoryCopy(src, target, cb) {
     // and reads shouldn't conflict.
     //_.partial(lockfile.lock, copylock, lockOpts),
     cb => {
-      if (!argv['preserve-target']) {
+      if (argv['preserve-target']) {
         console.log(`npm-pkgr removing ${target}`);
         fs.remove(target, cb);
       } else {
