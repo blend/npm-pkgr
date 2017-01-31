@@ -300,7 +300,7 @@ function installPackages(opts, cb) {
       var cancelAndExit = _.partial(cleanupForceExit, true);
       var src = path.join(cachedir, defaultOutputName);
       var target = path.join(opts.cwd, outputName);
-      debug(`cachedir: ${cacheDir}, lockfile: ${cacheLock}`);
+      debug(`cachedir: ${cachedir}, lockfile: ${cachelock}`);
       async.waterfall([
         function(cb) {
           async.series({
