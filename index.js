@@ -20,7 +20,7 @@ var pruneCache = require('./lib/prune-cache');
 
 var lockOpts = {
   wait: 10 * 1000,
-  stale: 3 * 60 * 1000, // 5 minute stale
+  stale: 10 * 60 * 1000, // 10 minute stale
   retries: 30
 };
 
