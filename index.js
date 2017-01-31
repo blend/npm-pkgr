@@ -22,7 +22,7 @@ var pruneCache = require('./lib/prune-cache');
 var lockOpts = {
   wait: 10 * 1000,
   stale: 10 * 60 * 1000, // 10 minute stale
-  retries: 30
+  retries: 60
 };
 
 var argv = require('yargs')
