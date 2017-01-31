@@ -3,6 +3,7 @@ var util = require('util');
 
 var async = require('async');
 var _ = require('lodash');
+var debug = require('debug')('npm-pkgr');
 var fs = require('fs-extra');
 var lockfile = require('lockfile');
 var path = require('path');
@@ -67,6 +68,7 @@ var argv = require('yargs')
 
 var NPM_PACKAGE_FILES = ['package.json', 'npm-shrinkwrap.json', '.npmrc'];
 
+
 function cleanupForceExit(exit) {
   try {
 
@@ -100,11 +102,19 @@ function createDirectoryCopy(src, target, cb) {
         fs.symlink(src, target, 'dir', cb);
       }
     }
-  ], cb);
+  ], err => {
+    if (err) {
+      debug(err.message);
+      debug(JSON.stringify(shelljs.ls(src)));
+      debug(JSON.stringify(shelljs.ls(target)));
+      return cb(err);
+    }
+    return cb();
+  });
 }
 
 function downloadPackages(commandName, cacheDir, cb) {
-  console.log('Downloading ' + commandName + ' packages');
+  debug(`Downloading ${commandName} packages`);
   var execOpts = {
     cwd: cacheDir,
     maxBuffer: 20 * 1024 * 1024
@@ -124,7 +134,7 @@ function downloadPackages(commandName, cacheDir, cb) {
 function buildPackages(commandName, cacheDir, cb) {
   switch (commandName) {
   case 'npm':
-    console.log('Building npm packages.');
+    debug('Rebuilding npm packages.');
 
     var npmRebuildCall = spawn('npm', ['rebuild'], { cwd: cacheDir });
     npmRebuildCall.stdout.on('data', function(data) {
@@ -134,7 +144,7 @@ function buildPackages(commandName, cacheDir, cb) {
       process.stderr.write('stderr: ' + data);
     });
     npmRebuildCall.on('close', function() {
-      console.log('npm rebuild complete.');
+      debug('npm rebuild complete.');
       cb();
     });
 
@@ -148,7 +158,7 @@ function buildPackages(commandName, cacheDir, cb) {
 
 function uploadToS3(cacheRoot, origFile, zipFilename, cb) {
   var zipFilepath = path.join(cacheRoot, zipFilename);
-  console.log('Uploading package to s3: ' + zipFilepath);
+  debug(`Uploading package to s3: ${zipFilepath}`);
   if (!argv.s3prefix) {
     return cb();
   }
@@ -170,7 +180,7 @@ function uploadToS3(cacheRoot, origFile, zipFilename, cb) {
     }
   ], function(err) {
     if (err) {
-      console.log('Error occurred while zipping/s3 uploaded: ' + err.message);
+      debug(`Error occurred while zipping/s3 uploaded: ${err.message}`);
     }
     fs.remove(zipFilepath, cb);
   });
@@ -196,7 +206,7 @@ function downloadS3File(cacheRoot, zipFilename, cb) {
         Bucket: argv.s3bucket,
         Key:  argv.s3prefix + '/' + zipFilename
       };
-      console.log('Attempting to pre-packaged version from s3');
+      debug(`Attempting to pre-packaged version from s3, params ${params}`);
 
       var zipFileStream = fs.createWriteStream(zipFilepath)
         .on('error', cb)
@@ -208,7 +218,7 @@ function downloadS3File(cacheRoot, zipFilename, cb) {
         .pipe(zipFileStream);
     },
     function(cb) {
-      console.log('Download successful, unzipping.');
+      debug(`Download successful, unzipping ${zipFilename} to ${cacheRoot}`);
       exec(util.format('tar xzf %s', zipFilename), { cwd: cacheRoot }, cb);
     }
   ], function(err) {
@@ -246,7 +256,6 @@ function downloadS3File(cacheRoot, zipFilename, cb) {
   *     }
   */
 function installPackages(opts, cb) {
-  var debug = require('debug')('npm-pkgr');
   var npmUsed = false;
   var production = argv.production;
   var cacheRoot = argv['cache-directory'];
@@ -291,12 +300,13 @@ function installPackages(opts, cb) {
       var cancelAndExit = _.partial(cleanupForceExit, true);
       var src = path.join(cachedir, defaultOutputName);
       var target = path.join(opts.cwd, outputName);
-      debug('cachedir: %s, lockfile: %s', cachedir, cachelock);
+      debug(`cachedir: ${cacheDir}, lockfile: ${cacheLock}`);
       async.waterfall([
         function(cb) {
           async.series({
             acquireLock: _.partial(lockfile.lock, cachelock, lockOpts),
             srcExists: function(cb) {
+              debug(`acquired lock ${cachelock} with lockOpts ${JSON.stringify(lockOpts)}`);
               // occassionally get into state where we only have doneFilePath
               // but not src, so check for both (ys, DSP-11156)
               fs.exists(src, function(exists) {
@@ -316,20 +326,27 @@ function installPackages(opts, cb) {
 
           if (res.doneFileExists) {
             if (!res.srcExists) {
-              console.log(`Error: ${src} not found but reporting finished, reinstalling...`);
+              debug(`Error: ${src} not found but reporting finished, reinstalling...`);
             } else {
               return cb(null, false);
             }
           }
 
-          console.log('Locally cached package not found.');
+          debug('Locally cached package not found, clearing cache directory');
           async.series([
             // Ensure that the build directory is cleared to prevent partial installs
-            _.partial(fs.remove, cachedir),
+            cb => fs.remove(cachedir, err => {
+              if (err) {
+                debug(err.message);
+                debug(JSON.stringify(shelljs.ls(cachedir)));
+                return cb(err);
+              }
+              return cb();
+            }),
             function(cb) {
               downloadS3File(cacheRoot, zipFilename, function(err) {
                 if (!err) return cb();
-                console.log('S3 download failed, installing packages locally.');
+                debug('S3 download failed, installing packages locally.');
 
                 var files = (function() {
                   if (commandName === 'npm') {
@@ -385,7 +402,7 @@ function installPackages(opts, cb) {
 }
 
 function npmPkgr(opts, cb) {
-  console.log('starting npm-pkgr with opts: %j', opts);
+  debug(`starting npm-pkgr with opts: ${JSON.stringify(opts)}`);
 
   var commandName = argv._[0];
   var cacheRoot = argv['cache-directory'];
