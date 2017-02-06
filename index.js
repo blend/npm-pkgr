@@ -101,16 +101,16 @@ function createDirectoryCopy(src, target, cb) {
     //_.partial(lockfile.lock, copylock, lockOpts),
     cb => {
       if (argv['preserve-target']) {
-        console.log(`npm-pkgr removing ${target}`);
+        debug(`npm-pkgr removing ${target}`);
         fs.remove(target, cb);
       } else {
-        console.log(`npm-pkgr preserving ${target}`);
+        debug(`npm-pkgr preserving ${target}`);
         cb();
       }
     },
     function(cb) {
       if (!argv['symlink']) {
-        console.log('npm-pkgr trying `rsync -at --delete` to copy');
+        debug('npm-pkgr trying `rsync -at --delete` to copy');
         const rsync = new Rsync()
           .flags('at')
           .delete()
@@ -118,18 +118,18 @@ function createDirectoryCopy(src, target, cb) {
           .destination(target);
         rsync.execute(function(err) {
             if (err) {
-              console.log('npm-pkgr falling back to cp -rp to copy');
+              debug('npm-pkgr falling back to cp -rp to copy');
               fs.copy(src, target, { clobber: true, preserveTimestamps: true }, cb);
             } else {
-              console.log('npm-pkgr used `rsync -at --delete` to copy');
+              debug('npm-pkgr used `rsync -at --delete` to copy');
               cb();
             }
           },
           function(stdoutBuff) {
-            console.log(`[rsync stdout] ${stdoutBuff.toString()}`);
+            debug(`[rsync stdout] ${stdoutBuff.toString()}`);
           },
           function(stderrBuff) {
-            console.log(`[rsync stderr] ${stderrBuff.toString()}`);
+            debug(`[rsync stderr] ${stderrBuff.toString()}`);
           }
         );
       } else {
