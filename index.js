@@ -5,6 +5,7 @@ var async = require('async');
 var _ = require('lodash');
 var debug = require('debug')('npm-pkgr');
 var fs = require('fs-extra');
+var Rsync = require('rsync');
 var lockfile = require('lockfile');
 var path = require('path');
 var aws = require('aws-sdk');
@@ -60,6 +61,10 @@ var argv = require('yargs')
     type: 'string',
     requiresArg: true
   })
+  .option('preserve-target', {
+    describe: 'Whether to overwrite output-directory before installing',
+    boolean: true
+  })
   .option('production', {
     describe: 'Install production packages only',
     boolean: true
@@ -94,10 +99,39 @@ function createDirectoryCopy(src, target, cb) {
     // The package is fully installed at this point so writes shouldn't occur,
     // and reads shouldn't conflict.
     //_.partial(lockfile.lock, copylock, lockOpts),
-    _.partial(fs.remove, target),
+    cb => {
+      if (argv['preserve-target']) {
+        debug(`npm-pkgr removing ${target}`);
+        fs.remove(target, cb);
+      } else {
+        debug(`npm-pkgr preserving ${target}`);
+        cb();
+      }
+    },
     function(cb) {
       if (!argv['symlink']) {
-        fs.copy(src, target, { preserveTimestamps: true }, cb);
+        debug('npm-pkgr trying `rsync -at --delete` to copy');
+        const rsync = new Rsync()
+          .flags('at')
+          .delete()
+          .source(src + '/.')
+          .destination(target);
+        rsync.execute(function(err) {
+            if (err) {
+              debug('npm-pkgr falling back to cp -rp to copy');
+              fs.copy(src, target, { clobber: true, preserveTimestamps: true }, cb);
+            } else {
+              debug('npm-pkgr used `rsync -at --delete` to copy');
+              cb();
+            }
+          },
+          function(stdoutBuff) {
+            debug(`[rsync stdout] ${stdoutBuff.toString()}`);
+          },
+          function(stderrBuff) {
+            debug(`[rsync stderr] ${stderrBuff.toString()}`);
+          }
+        );
       } else {
         fs.symlink(src, target, 'dir', cb);
       }
@@ -403,7 +437,6 @@ function installPackages(opts, cb) {
 
 function npmPkgr(opts, cb) {
   debug(`starting npm-pkgr with opts: ${JSON.stringify(opts)}`);
-
   var commandName = argv._[0];
   var cacheRoot = argv['cache-directory'];
   /**
